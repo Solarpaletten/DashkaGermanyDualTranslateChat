@@ -15,10 +15,9 @@ const DualTranslator: React.FC = () => {
     websocketRef
   } = useTranslator();
 
-  const dialects = ['fr-FR', 'fr-CH', 'ru-RU'];
+  const dialects = ['de-DE', 'ru-RU'];
   const dialectNames = {
-    'fr-FR': '🇫🇷 France',
-    'fr-CH': '🇨🇭 Suisse',
+    'de-DE': '🇩🇪 Deutsch',
     'ru-RU': '🇷🇺 Русский'
   };
 
@@ -73,7 +72,7 @@ const DualTranslator: React.FC = () => {
   useEffect(() => {
     if (translatedText && translatedText !== 'Перевод появится здесь...' && originalText) {
       const newEntry = {
-        speaker: username || (dialect.startsWith('ru') ? 'RU' : 'FR'),
+        speaker: username || (dialect.startsWith('ru') ? 'RU' : 'DE'),
         lang: dialect,
         text: originalText,
         translation: translatedText,

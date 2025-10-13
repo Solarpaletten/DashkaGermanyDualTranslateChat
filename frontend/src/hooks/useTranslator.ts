@@ -205,11 +205,11 @@ export const useTranslator = () => {
 
       if (translationMode === 'auto') {
         const detected = await detectLanguage(text);
-        setRecognitionLang(detected === 'RU' ? 'ru-RU' : 'fr-FR');
+        setRecognitionLang(detected === 'RU' ? 'ru-RU' : 'de-DE');
 
         if (detected === 'RU') {
           fromLang = 'RU';
-          toLang = 'FR';
+          toLang = 'DE';
         } else {
           fromLang = detected;
           toLang = 'RU';
@@ -252,7 +252,7 @@ export const useTranslator = () => {
       const targetLangCode = toLang.toLowerCase();
       if ('speechSynthesis' in window && translation) {
         const utterance = new SpeechSynthesisUtterance(translation);
-        utterance.lang = targetLangCode === 'ru' ? 'ru-RU' : 'fr-FR';
+        utterance.lang = targetLangCode === 'ru' ? 'ru-RU' : 'de-DE';
         utterance.rate = 0.9;
 
         const speakNow = () => {
@@ -303,7 +303,7 @@ export const useTranslator = () => {
     setStatus(newMode === 'auto' ? '🤖 Auto mode' : '🎯 Manual mode');
 
     const newLang = newMode === 'manual'
-      ? (currentRole === 'user' ? 'ru-RU' : 'fr-FR')
+      ? (currentRole === 'user' ? 'ru-RU' : 'de-DE')
       : 'ru-RU';
 
     setRecognitionLang(newLang);
@@ -320,7 +320,7 @@ export const useTranslator = () => {
     if (translationMode === 'manual') {
       setCurrentRole(role);
       if (recognitionRef.current) {
-        recognitionRef.current.lang = role === 'user' ? 'ru-RU' : 'fr-FR';
+        recognitionRef.current.lang = role === 'user' ? 'ru-RU' : 'de-DE';
       }
     }
   };
