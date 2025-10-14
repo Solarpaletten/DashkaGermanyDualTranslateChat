@@ -52,6 +52,14 @@ const DualTranslator: React.FC = () => {
     }
   };
 
+  const switchDialect = () => {
+    const nextIndex = (dialectIndex + 1) % dialects.length;
+    setDialectIndex(nextIndex);
+    const newDialect = dialects[nextIndex];
+    setDialect(newDialect);
+    setRecognitionLang(newDialect);
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Enter' && !isRecording) {
