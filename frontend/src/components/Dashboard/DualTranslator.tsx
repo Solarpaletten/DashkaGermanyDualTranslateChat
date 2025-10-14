@@ -26,6 +26,7 @@ const DualTranslator: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [roomCode, setRoomCode] = useState('');
   const [username, setUsername] = useState('');
+  const [isWakingUp, setIsWakingUp] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<Array<{
     speaker: string;
     lang: string;
@@ -34,7 +35,7 @@ const DualTranslator: React.FC = () => {
     timestamp: string;
   }>>([]);
 
-  const leftPanelRef = useRef<HTMLDivElement>(null);
+  const leftPanelRef = useRef<HTMLTextAreaElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
 
   const handleJoinRoom = (code: string, name: string) => {
@@ -93,38 +94,91 @@ const DualTranslator: React.FC = () => {
     if (rightPanelRef.current) rightPanelRef.current.scrollTop = rightPanelRef.current.scrollHeight;
   }, [translatedText]);
 
-  const copyToClipboard = async (text: string, label: string) => {
+  const pasteToOriginal = async () => {
     try {
-      await navigator.clipboard.writeText(text);
-      alert(`${label} скопирован`);
+      const text = await navigator.clipboard.readText();
+      setOriginalText(text);
+      performTranslation(text);
     } catch {
-      alert('Ошибка');
+      alert('Ошибка вставки');
+    }
+  };
+
+  const wakeUpAPI = async () => {
+    setIsWakingUp(true);
+    setStatus('⏰ Пробуждаю backend...');
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/health`);
+
+      if (response.ok) {
+        setStatus('✅ Backend проснулся!');
+        // Переподключить WebSocket
+        if (websocketRef?.current) {
+          websocketRef.current.close();
+        }
+        // useTranslator автоматически переподключится через initWebSocket
+      } else {
+        setStatus('❌ Backend не отвечает');
+      }
+    } catch (error) {
+      setStatus('❌ Ошибка подключения к backend');
+    } finally {
+      setIsWakingUp(false);
     }
   };
 
   return (
     <>
-      {!isConnected && <RoomJoin onJoin={handleJoinRoom} />}
+      {!isConnected && <RoomJoin onJoin={handleJoinRoom} />} {/* Показывать RoomJoin, если не подключен */}
       <div className="w-full h-screen flex flex-col bg-gradient-to-br from-purple-600 via-blue-600 to-teal-600">
-        <header className="flex justify-between items-center p-6">
+        <header className="flex justify-between items-center p-6 flex-wrap gap-3">
           <h1 className="text-white text-3xl font-bold">🎤 Dual Translator</h1>
-          <div className="px-4 py-2 bg-white/20 rounded-lg text-white font-semibold">
-            {dialectNames[dialect as keyof typeof dialectNames]}
+          <div className="flex items-center gap-3">
+            {/* Индикаторы состояния API*/}
+            <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
+              <span className="text-white text-sm font-medium">API</span>
+              <div
+                className={`w-3 h-3 rounded-full ${connectionStatus.ai ? 'bg-green-400' : 'bg-red-400'}`}
+                title={connectionStatus.ai ? 'Backend доступен' : 'Backend недоступен'}
+              />
+              <div
+                className={`w-3 h-3 rounded-full ${connectionStatus.ws ? 'bg-green-400' : 'bg-red-400'}`}
+                title={connectionStatus.ws ? 'WebSocket подключен' : 'WebSocket отключен'}
+              />
+            </div>
+
+            {/* Кнопка пробуждения */}
+            {!connectionStatus.ai && (
+              <button
+                onClick={wakeUpAPI}
+                disabled={isWakingUp}
+                className="px-3 py-1 bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-300 rounded text-white text-xs font-semibold transition-all"
+                title="Разбудить backend на Render"
+              >
+                {isWakingUp ? '⏳' : '⏰ Разбудить'}
+              </button>
+            )}
+
+            {/* Кнопка запуска */}
+            <button
+              onClick={toggleRecording}
+              className={`px-8 py-4 rounded-xl font-semibold text-white text-lg shadow-lg transition-all ${isRecording ? 'bg-red-600 hover:bg-red-700 animate-pulse' : 'bg-green-600 hover:bg-green-700'
+                }`}
+            >
+              {isRecording ? '⏹️ Остановить' : '▶️ Запустить'}
+            </button>
           </div>
+          {/* Выбор диалекта */}
           <button
-            onClick={toggleRecording}
-            className={`px-8 py-4 rounded-xl font-semibold text-white text-lg shadow-lg transition-all ${
-              isRecording ? 'bg-red-600 hover:bg-red-700 animate-pulse' : 'bg-green-600 hover:bg-green-700'
-            }`}
+            onClick={switchDialect}
+            className="px-4 py-2 bg-white/20 text-white rounded-lg font-semibold hover:bg-white/30"
           >
-            {isRecording ? '⏹️ Остановить' : '▶️ Запустить'}
+            {dialectNames[dialect as keyof typeof dialectNames]}
           </button>
-          <div className="flex gap-3">
-            <div className={`w-3 h-3 rounded-full ${connectionStatus.ws ? 'bg-green-400' : 'bg-red-400'}`} />
-            <div className={`w-3 h-3 rounded-full ${connectionStatus.ai ? 'bg-green-400' : 'bg-red-400'}`} />
-          </div>
         </header>
 
+        {/* Статусная строка */}
         <div className="px-6 pb-4">
           <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 text-center text-white">
             <span>{status}</span>
@@ -135,23 +189,45 @@ const DualTranslator: React.FC = () => {
         </div>
 
         <main className="flex-1 flex gap-4 px-6 pb-6">
+          {/* Левая панель - Оригинал */}
           <div className="flex-1 bg-white/10 backdrop-blur-sm rounded-2xl p-6 flex flex-col">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-white text-xl font-semibold">🗣️ Оригинал</h2>
-              <button
-                onClick={() => copyToClipboard(originalText, 'Оригинал')}
-                className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-white text-sm"
-              >
-                📋 Копировать
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={pasteToOriginal}
+                  className="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded-lg text-white text-sm"
+                >
+                  📋 Вставить
+                </button>
+                <button
+                  onClick={() => copyToClipboard(originalText, 'Оригинал')}
+                  className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-white text-sm"
+                >
+                  📋 Копировать
+                </button>
+              </div>
             </div>
-            <div ref={leftPanelRef} className="flex-1 bg-white/5 rounded-xl p-4 overflow-y-auto">
-              <p className="text-white text-lg leading-relaxed whitespace-pre-wrap">
-                {originalText || 'Начните говорить...'}
-              </p>
-            </div>
+            <textarea
+              ref={leftPanelRef}
+              value={originalText}
+              onChange={(e) => setOriginalText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.ctrlKey && e.key === 'v') {
+                  e.preventDefault();
+                  pasteToOriginal();
+                }
+                if (e.ctrlKey && e.key === 'Enter') {
+                  e.preventDefault();
+                  performTranslation(originalText);
+                }
+              }}
+              placeholder="Начните говорить или вставьте текст..."
+              className="flex-1 bg-white/5 rounded-xl p-4 text-white text-lg leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-white/50"
+            />
           </div>
 
+          {/* Правая панель - Перевод */}
           <div className="flex-1 bg-white/10 backdrop-blur-sm rounded-2xl p-6 flex flex-col">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-white text-xl font-semibold">🌐 Перевод</h2>
@@ -170,6 +246,7 @@ const DualTranslator: React.FC = () => {
           </div>
         </main>
 
+        {/* Нижняя панель - История */}
         <footer className="bg-white/10 backdrop-blur-sm p-6 text-white">
           <h3 className="font-semibold mb-3 text-lg">🕐 История разговора</h3>
           <div className="max-h-48 overflow-y-auto space-y-3 pr-2">
