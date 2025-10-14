@@ -12,7 +12,9 @@ const DualTranslator: React.FC = () => {
     connectionStatus,
     recognitionLang,
     setRecognitionLang,
-    websocketRef
+    websocketRef,
+    setOriginalText,
+    performTranslation
   } = useTranslator();
 
   const dialects = ['de-DE', 'ru-RU'];
@@ -26,7 +28,7 @@ const DualTranslator: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [roomCode, setRoomCode] = useState('');
   const [username, setUsername] = useState('');
-  const [isWakingUp, setIsWakingUp] = useState(false);
+  const [isWakingUp, setIsWakingUp] = useState(false); 
   const [conversationHistory, setConversationHistory] = useState<Array<{
     speaker: string;
     lang: string;
@@ -50,14 +52,6 @@ const DualTranslator: React.FC = () => {
       }));
       setIsConnected(true);
     }
-  };
-
-  const switchDialect = () => {
-    const nextIndex = (dialectIndex + 1) % dialects.length;
-    setDialectIndex(nextIndex);
-    const newDialect = dialects[nextIndex];
-    setDialect(newDialect);
-    setRecognitionLang(newDialect);
   };
 
   useEffect(() => {
