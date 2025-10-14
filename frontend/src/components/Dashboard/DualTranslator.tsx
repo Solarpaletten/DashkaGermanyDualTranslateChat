@@ -54,6 +54,23 @@ const DualTranslator: React.FC = () => {
     }
   };
 
+  const switchDialect = () => {
+    const nextIndex = (dialectIndex + 1) % dialects.length;
+    setDialectIndex(nextIndex);
+    const newDialect = dialects[nextIndex];
+    setDialect(newDialect);
+    setRecognitionLang(newDialect);
+  };
+
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert(`${label} скопирован`);
+    } catch {
+      alert('Ошибка');
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Enter' && !isRecording) {
