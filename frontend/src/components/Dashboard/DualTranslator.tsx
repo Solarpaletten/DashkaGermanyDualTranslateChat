@@ -17,18 +17,20 @@ const DualTranslator: React.FC = () => {
     performTranslation
   } = useTranslator();
 
-  const dialects = ['de-DE', 'ru-RU'];
+  const dialects = ['de-DE', 'de-AT', 'ru-RU'];
   const dialectNames = {
     'de-DE': '🇩🇪 Deutsch',
-    'ru-RU': '🇷🇺 Русский'
+    'de-AT': '🇦🇹 Österreich',
+    'ru-RU': '🇷🇺 Russisch'
   };
 
   const [dialect, setDialect] = useState(recognitionLang);
   const [dialectIndex, setDialectIndex] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
+  const [showRoomJoin, setShowRoomJoin] = useState(false);
   const [roomCode, setRoomCode] = useState('');
   const [username, setUsername] = useState('');
-  const [isWakingUp, setIsWakingUp] = useState(false); 
+  const [isWakingUp, setIsWakingUp] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<Array<{
     speaker: string;
     lang: string;
@@ -65,9 +67,9 @@ const DualTranslator: React.FC = () => {
   const copyToClipboard = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      alert(`${label} скопирован`);
+      alert(`${label} kopiert`);
     } catch {
-      alert('Ошибка');
+      alert('Fehler');
     }
   };
 
@@ -90,13 +92,13 @@ const DualTranslator: React.FC = () => {
   }, [dialectIndex, isRecording]);
 
   useEffect(() => {
-    if (translatedText && translatedText !== 'Перевод появится здесь...' && originalText) {
+    if (translatedText && translatedText !== 'Übersetzung erscheint hier...' && originalText) {
       const newEntry = {
         speaker: username || (dialect.startsWith('ru') ? 'RU' : 'DE'),
         lang: dialect,
         text: originalText,
         translation: translatedText,
-        timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+        timestamp: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
       };
       setConversationHistory(prev => {
         if (prev.length > 0 && prev[prev.length - 1].text === originalText) return prev;
@@ -119,29 +121,27 @@ const DualTranslator: React.FC = () => {
       setOriginalText(text);
       performTranslation(text);
     } catch {
-      alert('Ошибка вставки');
+      alert('Einfügefehler');
     }
   };
 
   const wakeUpAPI = async () => {
     setIsWakingUp(true);
-    setStatus('⏰ Пробуждаю backend...');
+    setStatus('⏰ Backend wird aufgeweckt...');
 
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/health`);
 
       if (response.ok) {
-        setStatus('✅ Backend проснулся!');
-        // Переподключить WebSocket
+        setStatus('✅ Backend ist wach!');
         if (websocketRef?.current) {
           websocketRef.current.close();
         }
-        // useTranslator автоматически переподключится через initWebSocket
       } else {
-        setStatus('❌ Backend не отвечает');
+        setStatus('❌ Backend antwortet nicht');
       }
     } catch (error) {
-      setStatus('❌ Ошибка подключения к backend');
+      setStatus('❌ Verbindungsfehler');
     } finally {
       setIsWakingUp(false);
     }
@@ -149,46 +149,62 @@ const DualTranslator: React.FC = () => {
 
   return (
     <>
-      {!isConnected && <RoomJoin onJoin={handleJoinRoom} />} {/* Показывать RoomJoin, если не подключен */}
+      {!isConnected && showRoomJoin && (
+        <RoomJoin 
+          onJoin={handleJoinRoom} 
+          onClose={() => setShowRoomJoin(false)} 
+        />
+      )}
       <div className="w-full h-screen flex flex-col bg-gradient-to-br from-purple-600 via-blue-600 to-teal-600">
         <header className="flex justify-between items-center p-6 flex-wrap gap-3">
           <h1 className="text-white text-3xl font-bold">🎤 Dual Translator</h1>
           <div className="flex items-center gap-3">
-            {/* Индикаторы состояния API*/}
+            {/* API-Statusanzeigen */}
             <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
               <span className="text-white text-sm font-medium">API</span>
               <div
                 className={`w-3 h-3 rounded-full ${connectionStatus.ai ? 'bg-green-400' : 'bg-red-400'}`}
-                title={connectionStatus.ai ? 'Backend доступен' : 'Backend недоступен'}
+                title={connectionStatus.ai ? 'Backend verfügbar' : 'Backend nicht verfügbar'}
               />
               <div
                 className={`w-3 h-3 rounded-full ${connectionStatus.ws ? 'bg-green-400' : 'bg-red-400'}`}
-                title={connectionStatus.ws ? 'WebSocket подключен' : 'WebSocket отключен'}
+                title={connectionStatus.ws ? 'WebSocket verbunden' : 'WebSocket getrennt'}
               />
             </div>
 
-            {/* Кнопка пробуждения */}
+            {/* Aufweck-Button */}
             {!connectionStatus.ai && (
               <button
                 onClick={wakeUpAPI}
                 disabled={isWakingUp}
                 className="px-3 py-1 bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-300 rounded text-white text-xs font-semibold transition-all"
-                title="Разбудить backend на Render"
+                title="Backend auf Render aufwecken"
               >
-                {isWakingUp ? '⏳' : '⏰ Разбудить'}
+                {isWakingUp ? '⏳' : '⏰ Aufwecken'}
               </button>
             )}
 
-            {/* Кнопка запуска */}
+            {/* Raum-Beitritts-Button - nur wenn Backend bereit ist */}
+            {connectionStatus.ai && connectionStatus.ws && !isConnected && (
+              <button
+                onClick={() => setShowRoomJoin(true)}
+                className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white text-sm font-semibold transition-all"
+                title="Raum erstellen oder beitreten"
+              >
+                🚪 Raum beitreten
+              </button>
+            )}
+
+            {/* Start/Stop-Button */}
             <button
               onClick={toggleRecording}
               className={`px-8 py-4 rounded-xl font-semibold text-white text-lg shadow-lg transition-all ${isRecording ? 'bg-red-600 hover:bg-red-700 animate-pulse' : 'bg-green-600 hover:bg-green-700'
                 }`}
             >
-              {isRecording ? '⏹️ Остановить' : '▶️ Запустить'}
+              {isRecording ? '⏹️ Stoppen' : '▶️ Starten'}
             </button>
           </div>
-          {/* Выбор диалекта */}
+          {/* Sprachauswahl */}
           <button
             onClick={switchDialect}
             className="px-4 py-2 bg-white/20 text-white rounded-lg font-semibold hover:bg-white/30"
@@ -197,33 +213,33 @@ const DualTranslator: React.FC = () => {
           </button>
         </header>
 
-        {/* Статусная строка */}
+        {/* Statusleiste */}
         <div className="px-6 pb-4">
           <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 text-center text-white">
             <span>{status}</span>
             <span className="ml-3 text-sm opacity-70">
-              {isConnected ? `Комната: ${roomCode} | ${username}` : '(Enter = язык | Space = запись)'}
+              {isConnected ? `Raum: ${roomCode} | ${username}` : '(Enter = Sprache | Leertaste = Aufnahme)'}
             </span>
           </div>
         </div>
 
         <main className="flex-1 flex gap-4 px-6 pb-6">
-          {/* Левая панель - Оригинал */}
+          {/* Linkes Panel - Original */}
           <div className="flex-1 bg-white/10 backdrop-blur-sm rounded-2xl p-6 flex flex-col">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-white text-xl font-semibold">🗣️ Оригинал</h2>
+              <h2 className="text-white text-xl font-semibold">🗣️ Original</h2>
               <div className="flex gap-2">
                 <button
                   onClick={pasteToOriginal}
                   className="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded-lg text-white text-sm"
                 >
-                  📋 Вставить
+                  📋 Einfügen
                 </button>
                 <button
-                  onClick={() => copyToClipboard(originalText, 'Оригинал')}
+                  onClick={() => copyToClipboard(originalText, 'Original')}
                   className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-white text-sm"
                 >
-                  📋 Копировать
+                  📋 Kopieren
                 </button>
               </div>
             </div>
@@ -241,36 +257,36 @@ const DualTranslator: React.FC = () => {
                   performTranslation(originalText);
                 }
               }}
-              placeholder="Начните говорить или вставьте текст..."
+              placeholder="Sprechen Sie oder fügen Sie Text ein..."
               className="flex-1 bg-white/5 rounded-xl p-4 text-white text-lg leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-white/50"
             />
           </div>
 
-          {/* Правая панель - Перевод */}
+          {/* Rechtes Panel - Übersetzung */}
           <div className="flex-1 bg-white/10 backdrop-blur-sm rounded-2xl p-6 flex flex-col">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-white text-xl font-semibold">🌐 Перевод</h2>
+              <h2 className="text-white text-xl font-semibold">🌐 Übersetzung</h2>
               <button
-                onClick={() => copyToClipboard(translatedText, 'Перевод')}
+                onClick={() => copyToClipboard(translatedText, 'Übersetzung')}
                 className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-white text-sm"
               >
-                📋 Копировать
+                📋 Kopieren
               </button>
             </div>
             <div ref={rightPanelRef} className="flex-1 bg-white/5 rounded-xl p-4 overflow-y-auto">
               <p className="text-white text-lg leading-relaxed whitespace-pre-wrap">
-                {translatedText || 'Перевод появится здесь...'}
+                {translatedText || 'Übersetzung erscheint hier...'}
               </p>
             </div>
           </div>
         </main>
 
-        {/* Нижняя панель - История */}
+        {/* Fußzeile - Gesprächsverlauf */}
         <footer className="bg-white/10 backdrop-blur-sm p-6 text-white">
-          <h3 className="font-semibold mb-3 text-lg">🕐 История разговора</h3>
+          <h3 className="font-semibold mb-3 text-lg">🕐 Gesprächsverlauf</h3>
           <div className="max-h-48 overflow-y-auto space-y-3 pr-2">
             {conversationHistory.length === 0 ? (
-              <p className="text-white/50 text-center py-4">История пуста</p>
+              <p className="text-white/50 text-center py-4">Verlauf ist leer</p>
             ) : (
               conversationHistory.map((msg, index) => (
                 <div key={index} className="bg-white/10 rounded-lg p-3 border-l-4 border-white/30">
